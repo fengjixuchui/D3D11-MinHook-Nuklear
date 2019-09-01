@@ -41,6 +41,7 @@ D3D11DrawIndexedHook            phookD3D11DrawIndexed = nullptr;
 D3D11CreateQueryHook			phookD3D11CreateQuery = nullptr;
 D3D11PSSetShaderResourcesHook	phookD3D11PSSetShaderResources = nullptr;
 D3D11ClearRenderTargetViewHook  phookD3D11ClearRenderTargetViewHook = nullptr;
+ID3D11RenderTargetView* RenderTargetView = nullptr;
 
 DWORD_PTR* pSwapChainVTable = nullptr;
 DWORD_PTR* pDeviceVTable = nullptr;
@@ -1160,6 +1161,14 @@ HRESULT __stdcall PresentHook(IDXGISwapChain* pSwapChain, UINT SyncInterval, UIN
 		pSwapChain->GetDevice(__uuidof(g_pd3dDevice), reinterpret_cast<void**>(&g_pd3dDevice));
 		g_pd3dDevice->GetImmediateContext(&g_pd3dContext);
 
+		// Necessary for some games (R6S), remove if it makes issues.
+		ID3D11Texture2D* renderTargetTexture = nullptr;
+		if (SUCCEEDED(pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<LPVOID*>(&renderTargetTexture))))
+		{
+			g_pd3dDevice->CreateRenderTargetView(renderTargetTexture, NULL, &g_pRenderTargetView);
+			renderTargetTexture->Release();
+		}
+		
 		renderer = new D3D11Renderer(pSwapChain);
 		renderer->Initialize();
 
@@ -1178,7 +1187,10 @@ HRESULT __stdcall PresentHook(IDXGISwapChain* pSwapChain, UINT SyncInterval, UIN
 
 		set_style(g_pNkContext, THEME_BLACK);
 		});
-
+	
+	// Necessary for some games (R6S), remove if it makes issues.
+	g_pd3dContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
+	
 	MSG msg;
 	nk_input_begin(g_pNkContext);
 	while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
